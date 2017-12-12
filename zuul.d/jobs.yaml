@@ -104,6 +104,7 @@
     name: contrail-vnc-docker-centos74
     voting: False
     run: playbooks/docker/centos74
+    post-run: playbooks/docker/post
     nodeset:
       nodes:
         - name: builder
