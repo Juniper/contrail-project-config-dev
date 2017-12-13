@@ -1,0 +1,4 @@
+- name: "Build container {{ item|replace('/','-') }}"
+  command: "bash build.sh {{ item }} &> {{ ansible_env.HOME }}/docker-logs/{{ item|replace('/','-') }}.log"
+  args:
+    chdir: "{{ docker_build_dir }}/containers"
