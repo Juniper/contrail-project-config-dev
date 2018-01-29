@@ -18,21 +18,50 @@
     nodeset:
       nodes:
         - name: ubuntu-xenial
-          label: ubuntu-xenial-builder
+          label: ubuntu-xenial
     secrets:
       - site_logs
 
 - job:
-    name: contrail-vnc-base
+    name: contrail-base
     parent: null
     description: |
-      A base job that prepares Contrail VNC sandbox using Android repo
+      A base job that prepares the builder
+    pre-run: playbooks/contrail/pre
+    post-run:
+      - playbooks/contrail/post
+      - playbooks/base/post-ssh
+      - playbooks/base/post-logs
+    roles:
+      - zuul: codilime/zuul-jobs
+    timeout: 28800
+    secrets:
+      - site_logs
+      - site_pulp
+
+- job:
+    name: contrail-src-base
+    parent: contrail-base
+    description: |
+      A base job that directly copies source code prepared by zuul to the builder node,
+      as opposed to the contrail-vnc-base job that uses Android repo to prepare the source tree.
+    pre-run: playbooks/contrail/src-pre
+    roles:
+      - zuul: codilime/zuul-jobs
+
+- job:
+    name: contrail-vnc-base
+    parent: contrail-base
+    description: |
+      A base job that prepares Contrail VNC sandbox using Android repo,
+      as opposed to the contrail-src-base job that copies the sources directly.
     required-projects:
       - Juniper/contrail-api-client
       - Juniper/contrail-build
       - Juniper/contrail-analytics
       - Juniper/contrail-common
       - Juniper/contrail-controller
+      - Juniper/contrail-fabric-utils
       - Juniper/contrail-generateDS
       - Juniper/contrail-heat
       - Juniper/contrail-provisioning
@@ -42,7 +71,10 @@
       - Juniper/contrail-packages
       - Juniper/contrail-packaging
       - Juniper/contrail-sandesh
+      - Juniper/contrail-specs
       - Juniper/contrail-third-party
+      - Juniper/contrail-test
+      - Juniper/contrail-test-ci
       - Juniper/contrail-vrouter
       - Juniper/contrail-webui-third-party
       - Juniper/contrail-web-controller
@@ -51,30 +83,24 @@
       - Juniper/contrail-web-storage
     irrelevant-files:
       - specs/.*
-    pre-run: playbooks/contrail/pre
-    post-run:
-      - playbooks/base/post-ssh
-      - playbooks/base/post-logs
-    roles:
-      - zuul: codilime/zuul-jobs
-    timeout: 28800
-    secrets:
-      - site_logs
+    pre-run: playbooks/contrail/vnc-pre
 
 - job:
-    name: contrail-vnc-repo-build
-    description: |
-    run: playbooks/contrail/
+    name: contrail-vnc-build-package-ubuntu-base
     voting: False
-    nodeset:
-      nodes:
-        - name: builder
-          label: ubuntu-xenial-small
+    description: |
+      Job that tests Contrail VNC (controller, analytics, etc.) packaging
+
+      This is a base job for testing packaging of Contrail VNC for Ubuntu-base
+      distributions. Release-based variants of this job are then added
+      to the Juniper/contrail-packages project.
+    files:
+      - ^debian/contrail/.*$
+    run: playbooks/packaging/contrail-vnc
 
 - job:
     name: contrail-vnc-build-package-el-base
     parent: contrail-vnc-base
-    voting: False
     description: |
       Job that tests Contrail VNC (controller, analytics, etc.) packaging
 
@@ -82,27 +108,21 @@
       Linux based distributions (CentOS, RHEL). Release-based variants of this
       job are then added to the Juniper/contrail-packages project.
     run: playbooks/packaging/contrail-vnc-el
+    post-run: playbooks/packaging/post-vnc-el
+    irrelevant-files:
+      - specs/.*
     secrets:
       - site_pulp
 
 - job:
     name: contrail-vnc-build-package-centos74
     parent: contrail-vnc-build-package-el-base
+    irrelevant-files:
+      - specs/.*
     nodeset:
       nodes:
         - name: builder
           label: centos-7-4-builder
-
-- job:
-    name: contrail-vnc-build-package-ubuntu-base
-    parent: contrail-vnc-prepare-repo-sandbox
-    description: |
-      Job that tests Contrail VNC (controller, analytics, etc.) packaging
-
-      This is a base job for testing packaging of Contrail VNC for Ubuntu-base
-      distributions. Release-based variants of this job are then added
-      to the Juniper/contrail-packages project.
-    run: playbooks/packaging/contrail-vnc.yaml
 
 - job:
     name: contrail-vnc-build-package-ubuntu-trusty
@@ -121,126 +141,165 @@
           label: ubuntu-xenial-builder
 
 - job:
-    name: contrail-vnc-prepare-repo-sandbox
-    voting: False
-    required-projects:
-      - Juniper/contrail-api
-      - Juniper/contrail-build
-      - Juniper/contrail-common
-      - Juniper/contrail-controller
-      - Juniper/contrail-generateDS
-      - Juniper/contrail-heat
-      - Juniper/contrail-neutron-plugin
-      - Juniper/contrail-nova-extensions
-      - Juniper/contrail-nova-vif-driver
-      - Juniper/contrail-packages
-      - Juniper/contrail-sandesh
-      - Juniper/contrail-third-party
-      - Juniper/contrail-vrouter
-      - Juniper/contrail-webui-third-party
-      - Juniper/contrail-web-controller
-      - Juniper/contrail-web-core
-      - Juniper/contrail-web-server-manager
-      - Juniper/contrail-web-storage
-    pre-run: playbooks/prepare-repo-sandbox/prepare-repo-sandbox
+    name: contrail-vnc-specs-linter
+    voting: false
+    run: playbooks/contrail/specs
+    nodeset:
+      nodes:
+        - name: builder
+          label: ubuntu-trusty-builder
 
 - job:
     name: contrail-vnc-build-unittest-ubuntu-trusty
-    voting: False
-    parent: contrail-vnc-prepare-repo-sandbox
+    required-projects:
+      - Juniper/contrail-build
+      - Juniper/contrail-controller
+      - Juniper/contrail-generateDS
+      - Juniper/contrail-third-party
+      - Juniper/contrail-packages
+      - Juniper/contrail-sandesh
+      - Juniper/contrail-vrouter
+      - Juniper/contrail-nova-vif-driver
+      - Juniper/contrail-common
+      - Juniper/contrail-analytics
+    irrelevant-files:
+      - specs/.*
     run: playbooks/unittest/contrail
     post-run: playbooks/unittest/post
     nodeset:
       nodes:
         - name: builder
           label: ubuntu-trusty-builder
+
 - job:
-    name: contrail-vnc-docker-centos74
-    voting: False
+    name: contrail-vnc-unittest-webui
+    parent: contrail-vnc-base
+    run: playbooks/unittest/webui
+    post-run: playbooks/unittest/webui-post
+    nodeset:
+      nodes:
+        - name: builder
+          label: centos-7-4-builder
+
+- job:
+    name: contrail-vnc-build-containers-centos74
+    parent: contrail-src-base
+    description: |
+      A job that builds the Contrail containers using contrail-container-builder
+      and uploads them to a Docker registry.
+    irrelevant-files:
+      - specs/.*
+    required-projects:
+      - Juniper/contrail-container-builder
+    pre-run:
+      - playbooks/docker/setup-docker-registry
+      - playbooks/docker/docker-pre
     run: playbooks/docker/centos74
     nodeset:
       nodes:
         - name: builder
-          label: ubuntu-xenial-builder
+          label: centos-7-4-builder
+    secrets:
+      - site_pulp
+      - docker_registry
 
 - job:
-    name: job-a
-    run: playbooks/zuulv3/job-a
-    nodeset:
-      nodes:
-        - name: ubuntu-trusty
-          label: ubuntu-trusty-builder
-
-- job:
-    name: job-b
-    run: playbooks/zuulv3/self-test
-    nodeset:
-      nodes:
-        - name: ubuntu-trusty
-          label: ubuntu-trusty-builder
-
-- job:
-    name: contrail-self-test
-    run: playbooks/contrail/self-test
-    nodeset:
-      nodes:
-        - name: ubuntu-trusty
-          label: ubuntu-trusty-builder
+    name: contrail-systest-centos74-kubernetes
+    parent: contrail-src-base
+    description: |
+      A job that deploys Contrail containers and a Kubernetes cluster
+      using contrail-ansible-deployer.
+    irrelevant-files:
+      - specs/.*
     required-projects:
-      - Juniper/contrail-packages
-
-- job:
-    name: contrail-self-test-default
-    run: playbooks/contrail/self-test
-    nodeset:
-      nodes:
-        - name: ubuntu-trusty
-          label: ubuntu-trusty-builder
-    required-projects:
-      - Juniper/contrail-packages
-
-- job:
-    name: contrail-vnc-docker-provision-centos74
-    voting: False
-    run: playbooks/docker/centos74-provision-systest
+      - Juniper/contrail-ansible-deployer
+    run: playbooks/docker/centos74-systest-kubernetes
     nodeset:
       nodes:
         - name: contrail-aio
           label: centos-7-4-builder
+    secrets:
+      - docker_registry
 
 - job:
-    name: pulp-upload
-    voting: False
-    run: playbooks/pulp-upload
+    name: contrail-systest-centos74-kolla-ocata
+    parent: contrail-src-base
+    description: |
+      A job that deploys Contrail containers using contrail-ansible-deployer,
+      OpenStack using Kolla and runs the CI sanity testsuite.
+    irrelevant-files:
+      - specs/.*
+    required-projects:
+      - Juniper/contrail-ansible-deployer
+    pre-run:
+      - playbooks/docker/setup-docker-registry
+    run: playbooks/kolla/centos74-provision-kolla
+    post-run: playbooks/sanitytest/post
+    nodeset:
+      nodes:
+        - name: kolla-aio
+          label: centos-7-4-builder-xxlarge
+    secrets:
+      - site_pulp
+      - docker_registry
+
+# XXX(kklimonda): temporary jobs to test periodic pipelines
+- job:
+    name: contrail-vnc-build-package-el-base-nightly
+    parent: contrail-vnc-base
+    description: |
+      Job that tests Contrail VNC (controller, analytics, etc.) packaging
+
+      This is a base job for testing packaging of Contrail VNC for Enterprise
+      Linux based distributions (CentOS, RHEL). Release-based variants of this
+      job are then added to the Juniper/contrail-packages project.
+    run: playbooks/packaging/contrail-vnc-el
+    post-run: playbooks/packaging/post-vnc-el-nightly
+    irrelevant-files:
+      - specs/.*
     secrets:
       - site_pulp
 
 - job:
-    name: a-parent
-    parent: null
-    pre-run: playbooks/dep-inh-test/a-parent-pre
+    name: contrail-vnc-build-containers-centos74-nightly
+    parent: contrail-src-base
+    description: |
+      A job that builds the Contrail containers using contrail-container-builder
+      and uploads them to a Docker registry.
+    irrelevant-files:
+      - specs/.*
+    required-projects:
+      - Juniper/contrail-container-builder
+    pre-run: playbooks/docker/docker-pre
+    run: playbooks/docker/centos74-nightly
     nodeset:
       nodes:
-        - name: ubuntu-trusty
-          label: ubuntu-trusty-builder
+        - name: builder
+          label: centos-7-4-builder
+    secrets:
+      - site_pulp
+      - docker_registry
 
 - job:
-    name: a-child
-    parent: a-parent
-    pre-run: playbooks/dep-inh-test/a-child-pre
-    run: playbooks/test/a-child-run
+    name: contrail-vnc-build-package-centos74-nightly
+    parent: contrail-vnc-build-package-el-base-nightly
+    irrelevant-files:
+      - specs/.*
     nodeset:
       nodes:
-        - name: ubuntu-trusty
-          label: ubuntu-trusty-builder
-
+        - name: builder
+          label: centos-7-4-builder
 - job:
-    name: a-dependant
-    parent: null
-    pre-run: playbooks/dep-inh-test/a-dependant-pre
-    run: playbooks/test/a-dependant-run
+    name: contrail-vnc-publish-containers-nightly
+    parent: contrail-src-base
+    description: |
+      A job for publishing Docker containers to DockerHub.
+    run: playbooks/docker/publish-nightly
     nodeset:
       nodes:
-        - name: ubuntu-trusty
-          label: ubuntu-trusty-builder
-
+        - name: builder
+          label: centos-7-4-builder
+    secrets:
+      - site_pulp
+      - docker_registry
+      - dockerhub

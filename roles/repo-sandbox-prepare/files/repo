@@ -323,8 +323,7 @@ def _Init(args, gitc_init=False):
       if os.path.exists(repodir):
         # This GITC Client has already initialized repo so continue.
         return
-    cwd = os.getcwd()
-    _print(str(cwd))
+
     os.mkdir(repodir)
   except OSError as e:
     if e.errno != errno.EEXIST:

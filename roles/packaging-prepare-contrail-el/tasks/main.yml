@@ -1,27 +1,9 @@
 - name: Prepare packaging variables
   contrail_packaging:
     zuul: "{{ zuul }}"
+    release_type: "{{ release_type }}"
 
-- name: Add a repository with Contrail dependencies
-  yum_repository:
-    name: contrail-tpc
-    description: Contrail third-party dependencies
-    baseurl: http://ci-repo.englab.juniper.net/pulp/repos/opencontrail-tpc/
-    gpgcheck: no
-  become: True
-  become_user: root
-
-# waiting for merge (38098, 38099)
-- name: Apply temporary patches for CentOS7.4
-  patch:
-    src: "{{ item.patch }}"
-    basedir: "{{ ansible_env.HOME }}/{{ packaging.target_dir }}/{{ item.path }}"
-    strip: 1
-  with_items:
-    - { patch: 'vrouter.patch', path: 'vrouter/' }
-    - { patch: 'contrail_spec.patch', path: 'tools/packages/' }
-
-# Needed while centos74 is not supported correctly 
+# Needed while centos74 is not supported correctly
 - name: Create missing directory
   file:
     state: directory
@@ -33,8 +15,8 @@
     src: "{{ item.source }}"
     state: link
   with_items:
-    - path: "{{ ansible_env.HOME }}/{{ packaging.target_dir }}/tools/packaging/build/package_configs/centoslinux741708"
-      source: "{{ ansible_env.HOME }}/{{ packaging.target_dir }}/tools/packaging/build/package_configs/centoslinux71"
     - path: "{{ ansible_env.HOME }}/{{ packaging.target_dir }}/controller/build/package_configs"
       source: "{{ ansible_env.HOME }}/{{ packaging.target_dir }}/tools/packaging/build/package_configs"
+    - path: "{{ ansible_env.HOME }}/{{ packaging.target_dir }}/tools/packaging/build/package_configs/centoslinux741708/mitaka"
+      source: "{{ ansible_env.HOME }}/{{ packaging.target_dir }}/tools/packaging/build/package_configs/centoslinux741708/ocata"
 

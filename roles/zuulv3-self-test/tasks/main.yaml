@@ -1,4 +1,4 @@
-- name: Verify connectivity to review.opencontrail.org
+- name: Verify connectivity to review2.opencontrail.org
   wait_for:
     host: review2.opencontrail.org
     port: 7999

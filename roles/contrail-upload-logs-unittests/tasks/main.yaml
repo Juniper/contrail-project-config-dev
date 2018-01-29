@@ -14,18 +14,32 @@
       - scons_test-FAIL.log
       - scons_test.log
       - scons_test_retry.log
-      - unittests-logs
   register: loglist
 
-- name: Gzip log files
+- name: Gzip summary log files
   archive:
     path: "{{ item.path }}"
     remove: true
   with_items: "{{ loglist.files }}"
 
-- name: Send logs to the executor
+- name: Send summary logs to the executor
   synchronize:
     mode: pull
     src: "{{ item.path }}.gz"
     dest: "{{ zuul.executor.log_root }}/"
   with_items: "{{ loglist.files }}"
+
+- stat:
+    path: "{{ ansible_env.HOME }}/unittests-logs"
+  register: logdir
+
+- name: Send unittest logs to the executor
+  synchronize:
+    mode: pull
+    recursive: yes
+    src: "{{ ansible_env.HOME }}/unittests-logs"
+    dest: "{{ zuul.executor.log_root }}/"
+    rsync_opts:
+      - "--exclude=third_party"
+  when: logdir.stat.isdir is defined and logdir.stat.isdir
+

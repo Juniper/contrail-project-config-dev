@@ -22,7 +22,16 @@ labels:
       - name: juniper-contrail-ci
   - name: ubuntu-trusty-builder
     image: ubuntu-trusty
-    min-ready: 2
+    min-ready: 0
+    provides:
+      - name: juniper-contrail-ci
+  - name: centos-7-4-builder
+    image: centos-7-4
+    min-ready: 0
+    provides:
+      - name: juniper-contrail-ci
+  - name: centos-7-4-builder-xxlarge
+    min-ready: 0
     provides:
       - name: juniper-contrail-ci
   - name: centos-7-4-builder
@@ -71,7 +80,12 @@ providers:
             console-log: True
             key-name: ci-infra-shared-key
           - name: centos-7-4-builder
-            flavor-name: m1.small
+            flavor-name: m1.16g_40g_8vcpu
+            diskimage: centos-7-4
+            console-log: True
+            key-name: ci-infra-shared-key
+          - name: centos-7-4-builder-xxlarge
+            flavor-name: m1.ci-systest
             diskimage: centos-7-4
             console-log: True
             key-name: ci-infra-shared-key
@@ -135,4 +149,3 @@ diskimages:
       DIB_DISTRIBUTION_MIRROR: 'http://10.84.5.38:8000/ubuntu'
       DIB_DEBOOTSTRAP_EXTRA_ARGS: '--no-check-gpg'
       DIB_DEBIAN_COMPONENTS: 'main,universe'
-

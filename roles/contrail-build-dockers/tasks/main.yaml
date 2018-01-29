@@ -1,67 +1,56 @@
-- name: Prepare packaging variables
-  contrail_packaging:
-    zuul: "{{ zuul }}"
-
-- name: Set container build dir
+- name: Set paths
   set_fact:
-    docker_build_dir: "{{ ansible_env.HOME }}/contrail-container-builder"
+    docker_build_dir: "{{ ansible_env.HOME }}/src/review2.opencontrail.org/Juniper/contrail-container-builder"
+    rpm_repo_config_dir: /etc/yum.repos.d
 
-- name: Clone contrail-container-builder repository
-  git:
-    repo: 'https://github.com/Juniper/contrail-container-builder'
-    force: yes
-    dest: "{{ docker_build_dir }}"
+- name: Check if Zuul overrode the registry port
+  stat:
+    path: "{{ zuul.executor.work_root }}/saved_vars.yaml"
+  register: varfile
+  delegate_to: localhost
 
-- name: Prepare container build configuration
+- name: Get the overridden registry port
+  include_vars:
+    file: "{{ zuul.executor.work_root }}/saved_vars.yaml"
+  when: varfile.stat.isreg is defined and varfile.stat.isreg
+
+- name: Set default registry port if not overridden
+  set_fact:
+    registry_port: "{{ docker_registry.port }}"
+  when: registry_port is not defined
+
+- name: Prepare build configuration - common.env
   copy:
     content: |
-      CONTRAIL_VERSION={{ zuul.buildset }}-{{ zuul.patchset }}
-      CONTRAIL_REGISTRY={{ site_pulp.fqdn }}
-      CONTRAIL_REPOSITORY=http://{{ site_pulp.fqdn }}:{{ site_pulp.registry_port }}/pulp/repos/{{ zuul.change }}-{{ zuul.patchset }}
-      OPENSTACK_VERSION=newton
+      CONTRAIL_VERSION={{ contrail_version }}
+      CONTRAIL_REGISTRY={{ contrail_docker_registry }}
+      CONTRAIL_REPOSITORY={{ contrail_package_repository }}
+      OPENSTACK_VERSION={{ openstack_version }}
+      OPENSTACK_SUBVERSION={{ openstack_subversion }}
     dest: "{{ docker_build_dir }}/common.env"
+
+- name: copy the repo files to containers build context
+  synchronize:
+    src: "{{ rpm_repo_config_dir }}/"
+    dest: "{{ docker_build_dir }}/containers/{{ item }}"
+  delegate_to: "{{ inventory_hostname }}"
+  with_items:
+    - base
+    - test/test
 
 - name: Create log dir
   file:
     path: "{{ ansible_env.HOME }}/docker-logs"
     state: directory
 
-- name: Build base containers
-  include: build_container.yaml
-  with_items:
-    - base
-    - analytics/base
-    - controller/config/base
-    - controller/control/base
-    - controller/webui/base
-    - test/base
+- name: Prepare container list
+  shell: ./build.sh list | grep -v INFO
+  become: true
+  register: docker_list
+  args:
+    chdir: "{{ docker_build_dir }}/containers"
 
 - name: Build microservices
   include: build_container.yaml
-  with_items:
-    - agent/vrouter/
-    - analytics/alarm-gen/
-    - analytics/api/
-    - analytics/collector/
-    - analytics/query-engine/
-    - analytics/snmp-collector/
-    - analytics/topology/
-    - controller/config/api/
-    - controller/config/devicemgr/
-    - controller/config/schema/
-    - controller/config/svcmonitor/
-    - controller/control/control/
-    - controller/control/dns/
-    - controller/control/named/
-    - controller/webui/job/
-    - controller/webui/web/
-    - external/cassandra/
-    - external/kafka/
-    - external/rabbitmq/
-    - external/zookeeper/
-    - kubernetes/kube-manager/
-    - kubernetes/vrouter-init/
-    - nodemgr/
-    - openstack/compute-contrail-backend/
-    - openstack/neutron-contrail-backend/
-    - test/newton/
+  with_items: "{{ docker_list.stdout_lines }}"
+

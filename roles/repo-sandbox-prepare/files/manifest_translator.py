@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
+import os
 import sys
 import yaml
 import lxml
@@ -16,10 +17,13 @@ def del_node(node):
     node.getparent().remove(node)
 
 def get_project(zuul_var, short_name):
-    for p in zuul_var['projects']:
-        if p['short_name'] == short_name:
-            return p
-    raise Exception('Project with short name' + short_name + 'not found. Known projects are: ' + ','.join([p['short_name'] for p in zuul_var['projects']]))
+    for project, data in zuul_var['_projects'].items():
+        if data['short_name'] == short_name:
+            return data
+
+    msg = "Zuul does not know about project {}.\n".format(short_name)
+    msg += "Make sure it is defined in ``required-projects'' for this job."
+    raise RuntimeError(msg)
 
 with open(zuul_var_path, 'r') as zuul_var_file:
   zuul_var = yaml.load(zuul_var_file)
@@ -47,9 +51,20 @@ for remote in remotes.values():
 for project in manifest.xpath('//project'):
     name = project.attrib['name']
     zuul_project = get_project(zuul_var, name)
-    head = subprocess.check_output(['git', 'symbolic-ref', 'HEAD'], cwd=zuul_var['executor']['work_root'] + '/' + zuul_project['src_dir'])
     project.attrib['remote'] = zuul_project['canonical_hostname']
+    head = subprocess.check_output(['git', 'symbolic-ref', 'HEAD'], cwd=zuul_var['executor']['work_root'] + '/' + zuul_project['src_dir'])
     project.attrib['revision'] = head[:-1]
+
+# XXX(kklimonda): Remove after contrail-packaging has been added to contrail-vnc
+for repo_name, repo_path in []:
+    if not manifest.find('//project[@name="%s"]' % (repo_name,)):
+        project = get_project(zuul_var, repo_name)
+        repo_node = etree.Element("project", name=project['short_name'], remote=project['canonical_hostname'], path=repo_path)
+        repo_node.tail = '\n'
+
+        head = subprocess.check_output(['git', 'symbolic-ref', 'HEAD'], cwd=zuul_var['executor']['work_root'] + '/' + project['src_dir'])
+        repo_node.attrib['revision'] = head[:-1]
+        manifest.getroot().append(repo_node)
 
 with open(manifest_path, 'w') as manifest_file:
     manifest_file.write(dump_xml(manifest))

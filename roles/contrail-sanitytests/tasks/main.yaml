@@ -1,0 +1,62 @@
+- name: Start all containers that were stopped during kolla docker daemon restart (pass one - network containers)
+  shell: 'docker ps -a  --format "{% raw %}{{.Names}}{% endraw %}" | while read line; do docker start $line; done'
+  ignore_errors: true
+  become: true
+
+- name: Start all containers that were stopped during kolla docker daemon restart (pass two - all containers)
+  shell: 'docker ps -a  --format "{% raw %}{{.Names}}{% endraw %}" | while read line; do docker start $line; done'
+  ignore_errors: true
+  become: true
+
+- name: Wait for services startup
+  wait_for:
+    timeout: 120
+
+- name: Set variables
+  set_fact:
+    testrunner_image: "{{ docker_registry.fqdn }}:{{ docker_registry.port }}/contrail-test:static-centos7-ocata"
+    repos_dir: "{{ ansible_env.HOME }}/mount"
+
+- name: Template the testbed.py
+  template:
+    src: testbed.py.j2
+    dest: "{{ ansible_env.HOME}}/testbed.py"
+
+- name: Create the directory with repos
+  file:
+    path: "{{ repos_dir }}"
+    state: directory
+
+# TODO Change this to zuul-merger prepared checkouts
+# TODO Use packaged contrail-test when test container will be built in previous steps
+- name: Clone test repositories
+  git:
+    repo: "https://github.com/Juniper/{{ item }}"
+    dest: "{{ repos_dir }}/{{ item }}"
+  with_items:
+    - contrail-test-ci
+    - contrail-test
+
+- name: create the directory for VM images
+  file:
+    path: "{{ repos_dir }}/contrail-test-ci/images"
+    state: directory
+
+- name: download the cirros image
+  get_url:
+    url: "http://{{ docker_registry.fqdn }}/static/cirros-0.3.0-x86_64-disk.vmdk"
+    dest: "{{ repos_dir }}/contrail-test-ci/images"
+
+- name: Pull the testrunner image
+  docker_image:
+    name: "{{ testrunner_image }}"
+  become: yes
+
+- name: Run the sanity test
+  command: "{{ ansible_env.HOME }}/mount/contrail-test-ci/testrunner.sh run -t {{ ansible_env.HOME }}/testbed.py -m {{ ansible_env.HOME }}/mount -k /root/.ssh/id_rsa -f ci_sanity '{{ testrunner_image }}'"
+  become: yes
+  ignore_errors: yes
+
+- name: test the xml report for failures
+  shell: "[ x\"$(grep testsuite /root/contrail-test-runs/*/reports/TESTS-TestSuites.xml  | grep -o  'failures=\\S\\+' | uniq)\" = x'failures=\"0\"' ]"
+  become: yes
