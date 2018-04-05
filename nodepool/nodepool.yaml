@@ -56,6 +56,7 @@ providers:
       - name: ubuntu-xenial
       - name: ubuntu-trusty
       - name: centos-7-4
+      - name: rhel-7
     pools:
       - name: ci-zuulv3
         max-servers: 4
@@ -94,6 +95,25 @@ diskimages:
   - name: centos-7-4
     elements:
       - centos-minimal
+      - vm
+      - growroot
+      - epel
+      - cloud-init
+      - openssh-server
+      - nodepool-base
+      - contrail-builder
+    env-vars:
+      TMPDIR: /opt/dib_tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_GRUB_TIMEOUT: '0'
+      DIB_EPEL_DISABLED: '0'
+      DIB_YUM_MINIMAL_CREATE_INTERFACES: '0'
+      DIB_INSTALLTYPE_pip_and_virtualenv: package
+  - name: rhel-7
+    elements:
+      - rhel7
+      - rhel-common
       - vm
       - growroot
       - epel
