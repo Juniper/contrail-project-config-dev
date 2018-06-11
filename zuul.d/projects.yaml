@@ -18,16 +18,7 @@
     name: systests
     check:
       jobs:
-        - contrail-vnc-build-package-centos74
-        - contrail-vnc-build-containers-centos74:
-            dependencies:
-              - contrail-vnc-build-package-centos74
-        - contrail-systest-centos74-kolla-ocata:
-            dependencies:
-              - contrail-vnc-build-containers-centos74
-        #- contrail-systest-centos74-kubernetes:
-        #    dependencies:
-        #      - contrail-vnc-build-containers-centos74
+        - noop
     gate:
       queue: contrail-vnc
       jobs:
@@ -37,13 +28,7 @@
     name: systests-nogate
     check:
       jobs:
-        - contrail-vnc-build-package-centos74
-        - contrail-vnc-build-containers-centos74:
-            dependencies:
-              - contrail-vnc-build-package-centos74
-        - contrail-systest-centos74-kolla-ocata:
-            dependencies:
-              - contrail-vnc-build-containers-centos74
+        - noop
 
 - project-template:
     name: noops
@@ -58,26 +43,7 @@
 - project:
     name: Juniper/contrail-analytics
     templates:
-      - unittests
-      - systests
-    check:
-      jobs:
-        - contrail-vnc-specs-linter:
-           files:
-             - specs/.*
-    periodic-nightly:
-      jobs:
-        - contrail-vnc-build-package-centos74-nightly:
-            vars:
-              release_type: nightly
-        - contrail-vnc-build-containers-centos74-nightly:
-            dependencies:
-              - contrail-vnc-build-package-centos74-nightly
-            vars:
-              release_type: nightly
-        - contrail-vnc-publish-containers-nightly:
-            dependencies:
-              - contrail-vnc-build-containers-centos74-nightly
+      - noops
 
 - project:
     name: Juniper/contrail-common
@@ -240,7 +206,7 @@
       - noops
 
 - project:
-    name: Juniper/contrail-project-config
+    name: Juniper/contrail-project-config-dev
     templates:
       - noops
 
@@ -248,22 +214,11 @@
     name: Juniper/contrail-ansible-deployer
     templates:
       - systests
-    check:
-      jobs:
-        - contrail-systest-centos74-kubernetes:
-            dependencies:
-              - contrail-vnc-build-containers-centos74
 
 - project:
     name: Juniper/contrail-container-builder
     templates:
       - systests
-    experimental:
-      jobs:
-        - contrail-vnc-build-containers-centos74
-        - contrail-systest-centos74-kolla-ocata:
-            dependencies:
-              - contrail-vnc-build-containers-centos74
 
 - project:
     name: Juniper/contrail-web-core

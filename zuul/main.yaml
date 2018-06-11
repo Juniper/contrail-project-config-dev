@@ -8,9 +8,10 @@
         untrusted-projects:
           - Juniper/zuul-jobs:
               shadow: Juniper/contrail-project-config-dev
-          - codilime/contrail-zuul-jobs
+          - Juniper/contrail-zuul-jobs
           - Juniper/contrail-api-client
           - Juniper/contrail-nova-extensions
+          - Juniper/contrail-vnc
       gerrit:
        untrusted-projects:
           - Juniper/contrail-analytics
@@ -29,7 +30,8 @@
           - Juniper/contrail-horizon
           - Juniper/contrail-neutron-plugin
           - Juniper/contrail-nova-vif-driver
-          - Juniper/contrail-packages
+          - Juniper/contrail-packages:
+              exclude: ['pipeline', 'job', 'semaphore', 'project', 'secret', 'project-template', 'nodeset']
           - Juniper/contrail-packaging
           - Juniper/contrail-provisioning
           - Juniper/contrail-puppet
